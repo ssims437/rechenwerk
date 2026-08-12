@@ -1,0 +1,851 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<title>Rechenwerk — ein Computer aus NAND-Gattern</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="description" content="Von einem einzigen Gatter bis zum laufenden Programm: Rechenwerk, Befehlsdecoder und Maschine aus NAND gebaut, erschöpfend geprüft, im Browser." />
+
+<style>
+  :root {
+    --grund: #F2F4F7;
+    --feld:  #FFFFFF;
+    --tief:  #E4E8EE;
+    --linie: #C3CBD6;
+    --tinte: #10151C;
+    --leise: #626F80;
+    --eins:  #C2760B;
+    --null:  #A9B4C2;
+    --akzent:#0E7490;
+    --warn:  #B3261E;
+    --schatten: 0 1px 0 rgba(16,21,28,.05), 0 10px 24px -16px rgba(16,21,28,.45);
+    --f-fest: ui-monospace, "Cascadia Mono", "SF Mono", Consolas, "DejaVu Sans Mono", monospace;
+    --f-text: -apple-system, "Segoe UI Variable Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --grund: #0E1116; --feld: #151A21; --tief: #0A0D12; --linie: #253040;
+      --tinte: #D8E0EA; --leise: #7A8899; --eins: #E8A33D; --null: #3A4757;
+      --akzent: #4FC3D9; --warn: #E0695E;
+      --schatten: 0 1px 0 rgba(255,255,255,.03), 0 12px 30px -18px #000;
+    }
+  }
+  :root[data-theme="dark"] {
+    --grund: #0E1116; --feld: #151A21; --tief: #0A0D12; --linie: #253040;
+    --tinte: #D8E0EA; --leise: #7A8899; --eins: #E8A33D; --null: #3A4757;
+    --akzent: #4FC3D9; --warn: #E0695E;
+    --schatten: 0 1px 0 rgba(255,255,255,.03), 0 12px 30px -18px #000;
+  }
+
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--grund); color:var(--tinte);
+    font-family:var(--f-text); font-size:15px; line-height:1.55; -webkit-font-smoothing:antialiased; }
+  .blatt { max-width:1180px; margin:0 auto;
+    padding: clamp(20px,4vw,44px) clamp(14px,3vw,28px) 64px;
+    display:flex; flex-direction:column; gap:18px; }
+
+  .marke { font-family:var(--f-fest); font-size:10px; letter-spacing:.2em; text-transform:uppercase;
+    color:var(--leise); display:flex; gap:12px; align-items:center; margin:0; }
+  .marke::after { content:""; flex:1; height:1px; background:var(--linie); }
+  h1 { font-family:var(--f-fest); font-weight:700; font-size:clamp(24px,4.2vw,40px);
+    line-height:1.06; letter-spacing:-.03em; margin:0; text-wrap:balance; }
+  h1 span { color:var(--eins); }
+  .vorspann { max-width:70ch; color:var(--leise); margin:0; }
+  .vorspann b { color:var(--tinte); font-weight:600; }
+
+  .leiste { display:flex; gap:8px; flex-wrap:wrap; align-items:center;
+    background:var(--feld); border:1px solid var(--linie); padding:9px 11px; box-shadow:var(--schatten); }
+  .kl { font-family:var(--f-fest); font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--leise); }
+  button, select { font-family:var(--f-fest); font-size:12px; color:var(--tinte); background:var(--grund);
+    border:1px solid var(--linie); border-radius:0; padding:6px 10px; cursor:pointer; letter-spacing:.03em; }
+  button:hover, select:hover { border-color:var(--akzent); }
+  button:active { background:var(--tief); }
+  button:disabled { opacity:.45; cursor:default; }
+  button.haupt { background:var(--akzent); border-color:var(--akzent); color:var(--feld); }
+  button.haupt:hover { filter:brightness(1.1); }
+  :focus-visible { outline:2px solid var(--akzent); outline-offset:2px; }
+
+  .buehne { display:grid; grid-template-columns: 1fr 1fr; gap:18px; align-items:start; }
+  @media (max-width: 900px) { .buehne { grid-template-columns: minmax(0,1fr); } }
+
+  .kasten { background:var(--feld); border:1px solid var(--linie); box-shadow:var(--schatten);
+    display:flex; flex-direction:column; min-width:0; }
+  .kasten-kopf { display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+    padding:8px 11px; border-bottom:1px solid var(--linie); }
+  .kasten-leib { padding:11px; display:flex; flex-direction:column; gap:10px; min-width:0; }
+
+  textarea { width:100%; min-height:230px; resize:vertical; font-family:var(--f-fest);
+    font-size:12.5px; line-height:1.5; background:var(--tief); color:var(--tinte);
+    border:1px solid var(--linie); padding:10px; white-space:pre; overflow-wrap:normal; overflow-x:auto; }
+
+  .register { display:grid; grid-template-columns:repeat(auto-fit,minmax(78px,1fr)); gap:1px;
+    background:var(--linie); border:1px solid var(--linie); }
+  .reg { background:var(--feld); padding:7px 9px; display:flex; flex-direction:column; gap:1px; }
+  .reg dt { font-family:var(--f-fest); font-size:9px; letter-spacing:.1em; text-transform:uppercase; color:var(--leise); margin:0; }
+  .reg dd { margin:0; font-family:var(--f-fest); font-size:15px; font-variant-numeric:tabular-nums; }
+  .reg dd small { color:var(--leise); font-size:10px; }
+
+  #speicher { display:grid; grid-template-columns:repeat(16,minmax(0,1fr)); gap:2px; }
+  .zelle { aspect-ratio:1; display:flex; align-items:center; justify-content:center;
+    font-family:var(--f-fest); font-size:9px; background:var(--tief); color:var(--leise);
+    border:1px solid transparent; overflow:hidden; }
+  .zelle.pc   { background:var(--akzent); color:var(--feld); border-color:var(--akzent); }
+  .zelle.arg  { border-color:var(--akzent); color:var(--tinte); }
+  .zelle.daten{ color:var(--tinte); background:var(--feld); }
+  .zelle.frisch { background:var(--eins); color:var(--feld); }
+
+  #ausgabe { font-family:var(--f-fest); font-size:13px; background:var(--tief);
+    border:1px solid var(--linie); padding:8px 10px; min-height:2.6em; word-break:break-all; }
+
+  canvas { display:block; width:100%; height:auto; background:var(--tief); border:1px solid var(--linie); }
+
+  table.liste { width:100%; border-collapse:collapse; font-family:var(--f-fest); font-size:11.5px; }
+  table.liste td { padding:2px 6px 2px 0; white-space:nowrap; }
+  table.liste tr.jetzt td { background:var(--akzent); color:var(--feld); }
+  .listenrahmen { max-height:230px; overflow:auto; border:1px solid var(--linie); padding:6px 8px; background:var(--tief); }
+
+  .fortschritt { height:4px; background:var(--tief); overflow:hidden; border:1px solid var(--linie); }
+  .fortschritt i { display:block; height:100%; background:var(--akzent); width:0; }
+
+  .noten { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:24px;
+    border-top:1px solid var(--linie); padding-top:20px; }
+  .noten section { display:flex; flex-direction:column; gap:6px; }
+  .noten h3 { font-family:var(--f-fest); font-size:13px; margin:0; letter-spacing:-.01em; }
+  .noten p { margin:0; color:var(--leise); font-size:14px; max-width:52ch; }
+  .noten b { color:var(--tinte); font-weight:600; }
+  code { font-family:var(--f-fest); font-size:.9em; background:var(--tief); padding:1px 4px; color:var(--tinte); }
+  footer { border-top:1px solid var(--linie); padding-top:14px; font-family:var(--f-fest);
+    font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--leise); }
+  footer a { color:var(--akzent); }
+</style>
+</head>
+<body>
+
+<div class="blatt">
+
+  <header>
+    <p class="marke">Ein Grundbaustein · sechzehn Befehle · erschöpfend geprüft</p>
+    <h1>Rechenwerk: ein Computer aus <span>NAND</span></h1>
+    <p class="vorspann">
+      Ein NAND-Gatter kann fast nichts: zwei Eingänge, ein Ausgang, und es sagt nur dann
+      nein, wenn beide ja sagen. Daraus lässt sich alles andere bauen — Verneinung, Und,
+      Oder, Addition, Vergleich, Sprung. Diese Seite tut das bis zum Ende: <b>Rechenwerk,
+      Operationsauswahl, Steuersignale und Befehlsdecoder bestehen aus nichts als NAND</b>,
+      darüber sitzt eine Maschine mit sechzehn Befehlen, und darauf läuft ein Programm,
+      das man Takt für Takt beobachten kann — bis hinunter zum einzelnen Gatter.
+    </p>
+  </header>
+
+  <div class="leiste">
+    <span class="kl">Programm</span>
+    <select id="prog">
+      <option value="fib" selected>Fibonacci</option>
+      <option value="mul">Multiplikation</option>
+      <option value="quad">Quadratzahlen</option>
+      <option value="zaehl">Herunterzählen</option>
+    </select>
+    <button id="b-assemblieren">Übersetzen</button>
+    <button id="b-lauf" class="haupt">Lauf</button>
+    <button id="b-takt">Ein Takt</button>
+    <button id="b-reset">Zurücksetzen</button>
+    <span class="kl">Tempo</span>
+    <select id="tempo">
+      <option value="1">1 Takt/Bild</option>
+      <option value="8" selected>8 Takte/Bild</option>
+      <option value="200">so schnell es geht</option>
+    </select>
+    <span class="kl" id="lage" style="margin-left:auto">bereit</span>
+  </div>
+
+  <dl class="register">
+    <div class="reg"><dt>Befehlszähler</dt><dd id="r-pc">0</dd></div>
+    <div class="reg"><dt>Akkumulator</dt><dd id="r-acc">0</dd></div>
+    <div class="reg"><dt>Null</dt><dd id="r-z">0</dd></div>
+    <div class="reg"><dt>Übertrag</dt><dd id="r-c">0</dd></div>
+    <div class="reg"><dt>Takte</dt><dd id="r-takte">0</dd></div>
+    <div class="reg"><dt>NAND gesamt</dt><dd id="r-nand">0</dd></div>
+    <div class="reg"><dt>je Takt</dt><dd id="r-nandtakt">0</dd></div>
+    <div class="reg"><dt>Zustand</dt><dd id="r-zustand">bereit</dd></div>
+  </dl>
+
+  <div class="buehne">
+
+    <div class="kasten">
+      <div class="kasten-kopf">
+        <span class="kl">Quelltext</span>
+        <span class="kl" id="asm-lage" style="margin-left:auto">—</span>
+      </div>
+      <div class="kasten-leib">
+        <textarea id="quelle" spellcheck="false" aria-label="Assembler-Quelltext"></textarea>
+        <div class="listenrahmen"><table class="liste" id="liste"><tbody></tbody></table></div>
+      </div>
+    </div>
+
+    <div class="kasten">
+      <div class="kasten-kopf">
+        <span class="kl">Speicher · 256 Byte</span>
+        <span class="kl" id="spei-lage" style="margin-left:auto">blau = Befehlszähler</span>
+      </div>
+      <div class="kasten-leib">
+        <div id="speicher"></div>
+        <span class="kl">Ausgabe</span>
+        <div id="ausgabe">—</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="kasten">
+    <div class="kasten-kopf">
+      <span class="kl">Bis auf die Gatter</span>
+      <select id="ebene">
+        <option value="nand">Ebene 1 — ein NAND</option>
+        <option value="xor">Ebene 2 — XOR aus vier NAND</option>
+        <option value="voll" selected>Ebene 3 — Volladdierer aus dreizehn NAND</option>
+        <option value="kette">Ebene 4 — acht Volladdierer in Reihe</option>
+      </select>
+      <span class="kl">Bit</span>
+      <select id="bitwahl"></select>
+      <span class="kl" id="gatter-lage" style="margin-left:auto">—</span>
+    </div>
+    <div class="kasten-leib">
+      <canvas id="gatter" width="1120" height="330" aria-label="Schaltbild der gerade gerechneten Stelle"></canvas>
+      <p class="kl">Leitung hell = 1 · Leitung dunkel = 0 · die Werte stammen aus dem gerade ausgeführten Befehl</p>
+    </div>
+  </div>
+
+  <div class="kasten">
+    <div class="kasten-kopf">
+      <span class="kl">Beweis statt Behauptung</span>
+      <button id="b-pruefen" class="haupt" style="margin-left:auto">Rechenwerk erschöpfend prüfen</button>
+    </div>
+    <div class="kasten-leib">
+      <p style="margin:0;color:var(--leise);font-size:14px">
+        Acht Operationen, je alle 65 536 Eingangspaare, gegen eine unabhängige Referenz —
+        Ergebnis, Übertrag und Null-Flag. Nicht Stichprobe, sondern vollständig.
+      </p>
+      <div class="fortschritt"><i id="pruef-balken"></i></div>
+      <table class="liste" id="pruef-tabelle"><tbody></tbody></table>
+      <p class="kl" id="pruef-fuss">noch nicht geprüft</p>
+    </div>
+  </div>
+
+  <div class="noten">
+    <section>
+      <h3>Warum NAND</h3>
+      <p>
+        NAND ist <b>funktional vollständig</b>: jede beliebige logische Funktion lässt sich
+        allein daraus zusammensetzen. <code>NOT a</code> ist <code>a NAND a</code>, und ab
+        da geht alles. Echte Chips nutzen das, weil ein NAND in CMOS mit vier Transistoren
+        auskommt und schneller schaltet als ein AND.
+      </p>
+    </section>
+    <section>
+      <h3>Was hier Schaltung ist</h3>
+      <p>
+        Aus Gattern: das <b>Rechenwerk</b> mit acht Operationen, die <b>Auswahl</b> unter
+        ihnen als Multiplexerbaum, die <b>Steuersignale</b> und der <b>Befehlsdecoder</b>,
+        der aus vier Bit sechzehn Leitungen macht. Als Feld modelliert: <b>Speicher und
+        Register</b>. Das ist keine Schaltung, und es steht hier, statt es zu verschweigen.
+      </p>
+    </section>
+    <section>
+      <h3>Was es kostet</h3>
+      <p>
+        Ein Befehl braucht rund <b>757 NAND-Auswertungen</b> allein im Rechenwerk — weil
+        alle acht Operationen immer gerechnet werden und der Multiplexer erst danach
+        auswählt. Genau so arbeitet Hardware: parallel und verschwenderisch, dafür in einem
+        Takt.
+      </p>
+    </section>
+    <section>
+      <h3>Selber schreiben</h3>
+      <p>
+        Der Quelltext links ist bearbeitbar. Marken mit Doppelpunkt, <code>;</code> leitet
+        einen Kommentar ein, <code>.BYTE</code> legt Daten ab. Sechzehn Befehle:
+        LDA STA LDI ADD SUB AND ORA XOR JMP JZ JC INC DEC OUT HLT NOP.
+      </p>
+    </section>
+  </div>
+
+  <footer>
+    Rechenwerk · Grundbaustein NAND · Rechenwerk, Multiplexerbaum, Steuersignale und Decoder aus Gattern · Speicher als Feld
+    <span style="display:block;margin-top:8px">
+      Verwandt:
+      <a href="https://ssims437.github.io/redundanz/">Redundanz</a> ·
+      <a href="https://ssims437.github.io/reparatur/">Reparatur</a> ·
+      <a href="https://ssims437.github.io/wuerfel/">Würfel</a> ·
+      <a href="https://ssims437.github.io/plotterblaetter/">Plotterblätter</a>
+    </span>
+  </footer>
+</div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const nf = new Intl.NumberFormat("de-DE");
+
+  /* ===================== Der einzige Grundbaustein ===================== */
+  let SCHALT = 0;
+  let SPUR = null;                       // wenn gesetzt, werden Knotenwerte mitgeschrieben
+  function nand(a, b, name) {
+    SCHALT++;
+    const y = (a & b) ^ 1;
+    if (SPUR && name) SPUR[name] = y;
+    return y;
+  }
+  const NOT = (a, n) => nand(a, a, n);
+  const AND = (a, b, n) => NOT(nand(a, b), n);
+  const OR  = (a, b, n) => nand(NOT(a), NOT(b), n);
+  const XOR = (a, b) => { const t = nand(a, b); return nand(nand(a, t), nand(b, t)); };
+  const MUX = (a, b, s) => OR(AND(a, NOT(s)), AND(b, s));
+
+  const bits = (n) => { const b = new Uint8Array(8); for (let i = 0; i < 8; i++) b[i] = (n >> i) & 1; return b; };
+  const zahl = (b) => { let n = 0; for (let i = 0; i < 8; i++) n |= b[i] << i; return n; };
+  const not8 = (a) => { const r = new Uint8Array(8); for (let i = 0; i < 8; i++) r[i] = NOT(a[i]); return r; };
+  const und8 = (a, b) => { const r = new Uint8Array(8); for (let i = 0; i < 8; i++) r[i] = AND(a[i], b[i]); return r; };
+  const oder8 = (a, b) => { const r = new Uint8Array(8); for (let i = 0; i < 8; i++) r[i] = OR(a[i], b[i]); return r; };
+  const xor8 = (a, b) => { const r = new Uint8Array(8); for (let i = 0; i < 8; i++) r[i] = XOR(a[i], b[i]); return r; };
+  const mux8 = (a, b, s) => { const r = new Uint8Array(8); for (let i = 0; i < 8; i++) r[i] = MUX(a[i], b[i], s); return r; };
+
+  // Volladdierer, ausgeschrieben mit benannten Knoten — daraus wird das Schaltbild
+  function volladdierer(a, b, cin, spur) {
+    const alt = SPUR; if (spur) SPUR = spur;
+    const n1 = nand(a, b, "n1");
+    const n2 = nand(a, n1, "n2");
+    const n3 = nand(b, n1, "n3");
+    const s1 = nand(n2, n3, "s1");          // a XOR b
+    const c1 = nand(n1, n1, "c1");          // a AND b
+    const n4 = nand(s1, cin, "n4");
+    const n5 = nand(s1, n4, "n5");
+    const n6 = nand(cin, n4, "n6");
+    const s  = nand(n5, n6, "s");           // Summe
+    const c2 = nand(n4, n4, "c2");          // s1 AND cin
+    const q1 = nand(c1, c1, "q1");
+    const q2 = nand(c2, c2, "q2");
+    const c  = nand(q1, q2, "c");           // Übertrag = c1 OR c2
+    if (spur) { spur.a = a; spur.b = b; spur.cin = cin; SPUR = alt; }
+    return { s, c };
+  }
+
+  function addierer8(a, b, cin, spuren) {
+    const s = new Uint8Array(8); let c = cin;
+    for (let i = 0; i < 8; i++) {
+      const sp = spuren ? (spuren[i] = {}) : null;
+      const v = volladdierer(a[i], b[i], c, sp);
+      s[i] = v.s; c = v.c;
+    }
+    return { s, c };
+  }
+
+  function mux8fach(k, s0, s1, s2) {
+    const a = mux8(mux8(k[0], k[1], s0), mux8(k[2], k[3], s0), s1);
+    const b = mux8(mux8(k[4], k[5], s0), mux8(k[6], k[7], s0), s1);
+    return mux8(a, b, s2);
+  }
+
+  const OPS = ["ADD", "SUB", "AND", "OR", "XOR", "NOT", "SHL", "SHR"];
+
+  function rechenwerk(a, b, op, spuren) {
+    const o = bits(op), s0 = o[0], s1 = o[1], s2 = o[2];
+    const istSub = AND(s0, AND(NOT(s1), NOT(s2)));
+    const add = addierer8(a, mux8(b, not8(b), istSub), istSub, spuren);
+    const shl = new Uint8Array(8), shr = new Uint8Array(8);
+    for (let i = 7; i > 0; i--) shl[i] = a[i - 1];
+    for (let i = 0; i < 7; i++) shr[i] = a[i + 1];
+    const k = [add.s, add.s, und8(a, b), oder8(a, b), xor8(a, b), not8(a), shl, shr];
+    const erg = mux8fach(k, s0, s1, s2);
+    let acc = 0; for (let i = 0; i < 8; i++) acc = OR(acc, erg[i]);
+    return { erg, c: AND(add.c, NOT(OR(s1, s2))), z: NOT(acc) };
+  }
+
+  // Vier Bit hinein, sechzehn Leitungen heraus, genau eine davon aktiv
+  function decoder16(o0, o1, o2, o3) {
+    const n = [NOT(o0), NOT(o1), NOT(o2), NOT(o3)], p = [o0, o1, o2, o3];
+    const L = new Uint8Array(16);
+    for (let i = 0; i < 16; i++) {
+      const b0 = (i & 1) ? p[0] : n[0], b1 = (i & 2) ? p[1] : n[1];
+      const b2 = (i & 4) ? p[2] : n[2], b3 = (i & 8) ? p[3] : n[3];
+      L[i] = AND(AND(b0, b1), AND(b2, b3));
+    }
+    return L;
+  }
+
+  /* ============================ Die Maschine ============================ */
+  const BEFEHLE = ["NOP","LDA","STA","LDI","ADD","SUB","AND","ORA","XOR","JMP","JZ","JC","INC","DEC","OUT","HLT"];
+  const MIT_ADRESSE = new Set([1,2,3,4,5,6,7,8,9,10,11]);
+
+  const M = { mem:new Uint8Array(256), pc:0, acc:0, z:0, c:0, halt:false, takte:0,
+              ausgabe:[], nand:0, letzteSpur:null, letzterOp:null, letzteSchreibung:-1, laeuft:false };
+
+  function takt() {
+    if (M.halt) return false;
+    const vorher = SCHALT;
+    M.takte++;
+    M.letzteSchreibung = -1;
+    const opcode = M.mem[M.pc] >> 4;
+    const o = bits(opcode);
+    const L = decoder16(o[0], o[1], o[2], o[3]);
+    const hatAdr = MIT_ADRESSE.has(opcode);
+    const adr = hatAdr ? M.mem[(M.pc + 1) & 255] : 0;
+    const naechste = (M.pc + (hatAdr ? 2 : 1)) & 255;
+    const b = (opcode === 3) ? adr : M.mem[adr];
+
+    let neuAcc = M.acc, springe = -1;
+    const rwOp = { 4:0, 5:1, 6:2, 7:3, 8:4 }[opcode];
+    const spuren = [];
+    if (rwOp !== undefined) {
+      const r = rechenwerk(bits(M.acc), bits(b), rwOp, spuren);
+      neuAcc = zahl(r.erg); M.z = r.z; M.c = r.c;
+      M.letzteSpur = spuren; M.letzterOp = OPS[rwOp] + "  " + M.acc + " , " + b;
+    } else if (opcode === 12 || opcode === 13) {
+      const r = rechenwerk(bits(M.acc), bits(1), opcode === 12 ? 0 : 1, spuren);
+      neuAcc = zahl(r.erg); M.z = r.z; M.c = r.c;
+      M.letzteSpur = spuren; M.letzterOp = (opcode === 12 ? "ADD" : "SUB") + "  " + M.acc + " , 1";
+    }
+
+    if (L[1]) neuAcc = M.mem[adr];
+    if (L[3]) neuAcc = adr;
+    if (L[2]) { M.mem[adr] = M.acc; M.letzteSchreibung = adr; }
+    if (L[9]) springe = adr;
+    if (L[10] && M.z) springe = adr;
+    if (L[11] && M.c) springe = adr;
+    if (L[14]) M.ausgabe.push(M.acc);
+    if (L[15]) M.halt = true;
+    if (opcode === 1 || opcode === 3) M.z = (neuAcc === 0) ? 1 : 0;
+
+    M.acc = neuAcc & 255;
+    M.pc = (springe >= 0 ? springe : naechste) & 255;
+    M.nand += SCHALT - vorher;
+    M.letzterTaktNand = SCHALT - vorher;
+    return !M.halt;
+  }
+
+  /* ============================= Assembler ============================== */
+  function assemble(text) {
+    const roh = text.split("\n").map((z) => z.replace(/;.*$/, "").trim());
+    const marken = {}; let adr = 0;
+    for (const z of roh) {
+      if (!z) continue;
+      const m = z.match(/^(\w+):$/);
+      if (m) { marken[m[1]] = adr; continue; }
+      const t = z.split(/\s+/), op = t[0].toUpperCase();
+      if (op === ".BYTE") { adr += t.length - 1; continue; }
+      const code = BEFEHLE.indexOf(op);
+      if (code < 0) throw new Error("unbekannter Befehl: " + t[0]);
+      adr += MIT_ADRESSE.has(code) ? 2 : 1;
+    }
+    const out = []; const zuZeile = [];
+    for (let i = 0; i < roh.length; i++) {
+      const z = roh[i];
+      if (!z || /^(\w+):$/.test(z)) continue;
+      const t = z.split(/\s+/), op = t[0].toUpperCase();
+      if (op === ".BYTE") { for (let k = 1; k < t.length; k++) { zuZeile.push([out.length, z]); out.push(Number(t[k]) & 255); } continue; }
+      const code = BEFEHLE.indexOf(op);
+      zuZeile.push([out.length, z]);
+      out.push(code << 4);
+      if (MIT_ADRESSE.has(code)) {
+        const arg = t[1];
+        if (arg === undefined) throw new Error(op + " braucht eine Adresse");
+        const wert = (arg in marken) ? marken[arg] : Number(arg);
+        if (!Number.isFinite(wert)) throw new Error("unbekannte Marke: " + arg);
+        out.push(wert & 255);
+      }
+    }
+    return { code: Uint8Array.from(out), zuZeile };
+  }
+
+  /* ============================= Programme ============================== */
+  const PROGRAMME = {
+    fib: `; Fibonacci — die ersten zehn Glieder
+LDI 0
+STA 200
+LDI 1
+STA 201
+LDI 10
+STA 202
+schleife:
+LDA 200
+OUT
+LDA 200
+ADD 201
+STA 203
+LDA 201
+STA 200
+LDA 203
+STA 201
+LDA 202
+DEC
+STA 202
+JZ ende
+JMP schleife
+ende:
+HLT`,
+    mul: `; Multiplikation durch wiederholtes Addieren
+LDI 13
+STA 200
+LDI 11
+STA 201
+LDI 0
+STA 202
+schleife:
+LDA 201
+JZ fertig
+LDA 202
+ADD 200
+STA 202
+LDA 201
+DEC
+STA 201
+JMP schleife
+fertig:
+LDA 202
+OUT
+HLT`,
+    quad: `; Quadratzahlen bis 15 mal 15
+LDI 16
+STA 203
+LDI 1
+STA 200
+schleife:
+LDA 200
+STA 201
+LDI 0
+STA 202
+innen:
+LDA 201
+JZ raus
+LDA 202
+ADD 200
+STA 202
+LDA 201
+DEC
+STA 201
+JMP innen
+raus:
+LDA 202
+OUT
+LDA 200
+INC
+STA 200
+SUB 203
+JZ ende
+JMP schleife
+ende:
+HLT`,
+    zaehl: `; Von zehn herunter — der kleinste sinnvolle Lauf
+LDI 10
+schleife:
+OUT
+DEC
+JZ ende
+JMP schleife
+ende:
+OUT
+HLT`
+  };
+
+  /* ============================ Darstellung ============================= */
+  let zuZeile = [];
+
+  function zeichneSpeicher() {
+    const host = $("speicher");
+    if (host.children.length !== 256) {
+      host.textContent = "";
+      const f = document.createDocumentFragment();
+      for (let i = 0; i < 256; i++) { const d = document.createElement("div"); d.className = "zelle"; f.append(d); }
+      host.append(f);
+    }
+    const argAdr = MIT_ADRESSE.has(M.mem[M.pc] >> 4) ? (M.pc + 1) & 255 : -1;
+    for (let i = 0; i < 256; i++) {
+      const z = host.children[i], v = M.mem[i];
+      z.textContent = v ? v.toString(16).padStart(2, "0") : "·";
+      z.className = "zelle" + (v ? " daten" : "") +
+        (i === M.pc ? " pc" : "") + (i === argAdr ? " arg" : "") +
+        (i === M.letzteSchreibung ? " frisch" : "");
+      z.title = "Adresse " + i + " = " + v;
+    }
+  }
+
+  function zeichneListe() {
+    const tb = $("liste").querySelector("tbody");
+    tb.textContent = "";
+    for (const [adr, text] of zuZeile) {
+      const tr = document.createElement("tr");
+      if (adr === M.pc) tr.className = "jetzt";
+      tr.innerHTML = "<td>" + String(adr).padStart(3, "0") + "</td><td>" + text.replace(/</g, "&lt;") + "</td>";
+      tb.append(tr);
+    }
+    const jetzt = tb.querySelector("tr.jetzt");
+    if (jetzt) jetzt.scrollIntoView({ block: "nearest" });
+  }
+
+  function werte() {
+    $("r-pc").innerHTML = M.pc + " <small>0x" + M.pc.toString(16).padStart(2, "0") + "</small>";
+    $("r-acc").innerHTML = M.acc + " <small>0x" + M.acc.toString(16).padStart(2, "0") + "</small>";
+    $("r-z").textContent = M.z;
+    $("r-c").textContent = M.c;
+    $("r-takte").textContent = nf.format(M.takte);
+    $("r-nand").textContent = nf.format(M.nand);
+    $("r-nandtakt").textContent = nf.format(M.letzterTaktNand || 0);
+    $("r-zustand").textContent = M.halt ? "angehalten" : (M.laeuft ? "läuft" : "bereit");
+    $("ausgabe").textContent = M.ausgabe.length ? M.ausgabe.join("  ") : "—";
+  }
+
+  /* ========================== Das Schaltbild ============================ */
+  function farben() {
+    const cs = getComputedStyle(document.documentElement);
+    return { tief: cs.getPropertyValue("--tief").trim(), linie: cs.getPropertyValue("--linie").trim(),
+      eins: cs.getPropertyValue("--eins").trim(), null: cs.getPropertyValue("--null").trim(),
+      tinte: cs.getPropertyValue("--tinte").trim(), leise: cs.getPropertyValue("--leise").trim(),
+      akzent: cs.getPropertyValue("--akzent").trim(), feld: cs.getPropertyValue("--feld").trim() };
+  }
+
+  // Name ins Gatter statt darüber: über dem Gatter kollidiert er mit Leitungen
+  // und mit der Überschrift.
+  function nandSymbol(g, x, y, w, h, aus, F, name) {
+    g.strokeStyle = F.linie; g.lineWidth = 1.4;
+    g.fillStyle = F.feld;
+    g.beginPath();
+    g.moveTo(x, y); g.lineTo(x + w * .55, y);
+    g.arc(x + w * .55, y + h / 2, h / 2, -Math.PI / 2, Math.PI / 2);
+    g.lineTo(x, y + h); g.closePath();
+    g.fill(); g.stroke();
+    g.beginPath(); g.arc(x + w * .55 + h / 2 + 4, y + h / 2, 3.2, 0, 7);
+    g.fillStyle = aus ? F.eins : F.null; g.fill(); g.strokeStyle = F.linie; g.stroke();
+    if (name) {
+      g.fillStyle = aus ? F.eins : F.leise;
+      g.font = "11px ui-monospace, Consolas, monospace";
+      g.textAlign = "center";
+      g.fillText(name, x + w * .42, y + h / 2 + 4);
+      g.textAlign = "left";
+    }
+  }
+  function leitung(g, punkte, wert, F) {
+    g.strokeStyle = wert ? F.eins : F.null;
+    g.lineWidth = wert ? 2.2 : 1.4;
+    g.beginPath(); g.moveTo(punkte[0][0], punkte[0][1]);
+    for (let i = 1; i < punkte.length; i++) g.lineTo(punkte[i][0], punkte[i][1]);
+    g.stroke();
+  }
+  function beschrift(g, t, x, y, F, farbe) {
+    g.fillStyle = farbe || F.leise;
+    g.font = "11px ui-monospace, Consolas, monospace";
+    g.fillText(t, x, y);
+  }
+
+  function zeichneGatter() {
+    const c = $("gatter"), g = c.getContext("2d"), F = farben();
+    g.fillStyle = F.tief; g.fillRect(0, 0, c.width, c.height);
+    const ebene = $("ebene").value;
+    const bit = +$("bitwahl").value || 0;
+    const sp = (M.letzteSpur && M.letzteSpur[bit]) ? M.letzteSpur[bit] : null;
+
+    if (!sp) {
+      beschrift(g, "Noch keine Rechenoperation ausgeführt — einen Takt weiterschalten,", 20, 40, F, F.leise);
+      beschrift(g, "bis ein ADD, SUB, INC oder DEC an der Reihe ist.", 20, 58, F, F.leise);
+      $("gatter-lage").textContent = "—";
+      return;
+    }
+    $("gatter-lage").textContent = (M.letzterOp || "") + "  ·  Bit " + bit;
+
+    const w = c.width;
+    if (ebene === "nand") {
+      const aus = sp.n1;
+      beschrift(g, "NAND — der einzige Grundbaustein", 24, 28, F, F.tinte);
+      leitung(g, [[60, 120], [200, 120]], sp.a, F);
+      leitung(g, [[60, 180], [200, 180]], sp.b, F);
+      nandSymbol(g, 200, 110, 120, 80, aus, F);
+      leitung(g, [[335, 150], [470, 150]], aus, F);
+      beschrift(g, "a = " + sp.a, 24, 124, F, sp.a ? F.eins : F.leise);
+      beschrift(g, "b = " + sp.b, 24, 184, F, sp.b ? F.eins : F.leise);
+      beschrift(g, "= " + aus, 480, 154, F, aus ? F.eins : F.leise);
+      beschrift(g, "Nur wenn beide Eingänge 1 sind, ist der Ausgang 0.", 24, 250, F);
+    } else if (ebene === "xor") {
+      beschrift(g, "XOR aus vier NAND — die Summe zweier Bits ohne Übertrag", 24, 28, F, F.tinte);
+      const G = [[220,60,"n1",sp.n1],[420,40,"n2",sp.n2],[420,150,"n3",sp.n3],[620,95,"s1",sp.s1]];
+      leitung(g, [[70,80],[220,80]], sp.a, F);
+      leitung(g, [[70,190],[220,190]], sp.b, F);
+      leitung(g, [[70,80],[70,60],[400,60],[400,60]], sp.a, F);
+      leitung(g, [[70,190],[70,210],[400,210],[400,190]], sp.b, F);
+      for (const [x,y,n,v] of G) nandSymbol(g, x, y, 110, 70, v, F, n);
+      leitung(g, [[345,95],[380,95],[380,60],[420,60]], sp.n1, F);
+      leitung(g, [[345,95],[380,95],[380,185],[420,185]], sp.n1, F);
+      leitung(g, [[545,75],[590,75],[590,115],[620,115]], sp.n2, F);
+      leitung(g, [[545,185],[590,185],[590,150],[620,150]], sp.n3, F);
+      leitung(g, [[745,130],[880,130]], sp.s1, F);
+      beschrift(g, "a = " + sp.a, 24, 84, F, sp.a?F.eins:F.leise);
+      beschrift(g, "b = " + sp.b, 24, 194, F, sp.b?F.eins:F.leise);
+      beschrift(g, "a XOR b = " + sp.s1, 890, 134, F, sp.s1?F.eins:F.leise);
+      beschrift(g, "Zwei Bits sind verschieden genau dann, wenn dieser Ausgang 1 ist.", 24, 290, F);
+    } else if (ebene === "voll") {
+      beschrift(g, "Volladdierer — dreizehn NAND, addiert drei Bits zu Summe und Übertrag", 24, 26, F, F.tinte);
+      const G = [
+        [150, 55, "n1", sp.n1], [300, 30, "n2", sp.n2], [300, 110, "n3", sp.n3], [450, 70, "s1", sp.s1],
+        [450, 175, "c1", sp.c1],
+        [600, 55, "n4", sp.n4], [750, 30, "n5", sp.n5], [750, 110, "n6", sp.n6], [900, 70, "s", sp.s],
+        [600, 175, "c2", sp.c2], [750, 200, "q1", sp.q1], [750, 255, "q2", sp.q2], [900, 215, "c", sp.c]
+      ];
+      for (const [x, y, n, v] of G) nandSymbol(g, x, y, 90, 56, v, F, n);
+      leitung(g, [[60, 70], [150, 70]], sp.a, F);
+      leitung(g, [[60, 96], [150, 96]], sp.b, F);
+      leitung(g, [[60, 300], [560, 300], [560, 96], [600, 96]], sp.cin, F);
+      leitung(g, [[258, 83], [280, 83], [280, 45], [300, 45]], sp.n1, F);
+      leitung(g, [[258, 83], [280, 83], [280, 125], [300, 125]], sp.n1, F);
+      leitung(g, [[258, 83], [275, 83], [275, 190], [450, 190]], sp.n1, F);
+      leitung(g, [[408, 58], [430, 58], [430, 85], [450, 85]], sp.n2, F);
+      leitung(g, [[408, 138], [430, 138], [430, 100], [450, 100]], sp.n3, F);
+      leitung(g, [[558, 98], [580, 98], [580, 70], [600, 70]], sp.s1, F);
+      leitung(g, [[708, 83], [730, 83], [730, 45], [750, 45]], sp.n4, F);
+      leitung(g, [[708, 83], [730, 83], [730, 125], [750, 125]], sp.n4, F);
+      leitung(g, [[708, 83], [725, 83], [725, 190], [600, 190]], sp.n4, F);
+      leitung(g, [[858, 58], [880, 58], [880, 85], [900, 85]], sp.n5, F);
+      leitung(g, [[858, 138], [880, 138], [880, 100], [900, 100]], sp.n6, F);
+      leitung(g, [[558, 203], [730, 203], [730, 215], [750, 215]], sp.c1, F);
+      leitung(g, [[708, 203], [720, 203], [720, 270], [750, 270]], sp.c2, F);
+      leitung(g, [[858, 228], [880, 228], [880, 230], [900, 230]], sp.q1, F);
+      leitung(g, [[858, 283], [880, 283], [880, 245], [900, 245]], sp.q2, F);
+      leitung(g, [[1008, 98], [1080, 98]], sp.s, F);
+      leitung(g, [[1008, 243], [1080, 243]], sp.c, F);
+      beschrift(g, "a=" + sp.a, 24, 74, F, sp.a ? F.eins : F.leise);
+      beschrift(g, "b=" + sp.b, 24, 100, F, sp.b ? F.eins : F.leise);
+      beschrift(g, "Übertrag herein=" + sp.cin, 24, 304, F, sp.cin ? F.eins : F.leise);
+      beschrift(g, "Summe " + sp.s, 1010, 90, F, sp.s ? F.eins : F.leise);
+      beschrift(g, "Übertrag " + sp.c, 1010, 235, F, sp.c ? F.eins : F.leise);
+    } else {
+      beschrift(g, "Acht Volladdierer in Reihe — der Übertrag wandert von rechts nach links", 24, 26, F, F.tinte);
+      const bx = 60, bw = 122, by = 90, bh = 110;
+      for (let i = 7; i >= 0; i--) {
+        const s = M.letzteSpur[i] || {};
+        const x = bx + (7 - i) * bw;
+        g.strokeStyle = (i === bit) ? F.akzent : F.linie;
+        g.lineWidth = (i === bit) ? 2 : 1;
+        g.fillStyle = F.feld;
+        g.fillRect(x, by, bw - 14, bh); g.strokeRect(x, by, bw - 14, bh);
+        beschrift(g, "Bit " + i, x + 8, by - 8, F, (i === bit) ? F.akzent : F.leise);
+        beschrift(g, "a " + (s.a ?? "-"), x + 10, by + 26, F, s.a ? F.eins : F.leise);
+        beschrift(g, "b " + (s.b ?? "-"), x + 10, by + 46, F, s.b ? F.eins : F.leise);
+        beschrift(g, "S " + (s.s ?? "-"), x + 10, by + 76, F, s.s ? F.eins : F.leise);
+        beschrift(g, "C " + (s.c ?? "-"), x + 10, by + 96, F, s.c ? F.eins : F.leise);
+        if (i > 0) leitung(g, [[x, by + 96], [x - 14, by + 96]], s.c, F);
+      }
+      const summe = M.letzteSpur.map((s) => s.s ?? 0);
+      beschrift(g, "Summe insgesamt: " + zahl(Uint8Array.from(summe)) +
+        "   (Bits von links nach rechts: " + summe.slice().reverse().join("") + ")", 60, 250, F, F.tinte);
+      beschrift(g, "Jeder Kasten wartet auf den Übertrag seines rechten Nachbarn. Deshalb heißt das Ripple-Carry.", 60, 280, F);
+    }
+  }
+
+  /* ========================= Erschöpfende Prüfung ======================= */
+  function referenz(op, a, b) {
+    switch (op) {
+      case 0: return (a + b) & 255; case 1: return (a - b) & 255;
+      case 2: return a & b; case 3: return a | b; case 4: return a ^ b;
+      case 5: return (~a) & 255; case 6: return (a << 1) & 255; case 7: return a >>> 1;
+    }
+  }
+  let pruefeLaeuft = false;
+  async function pruefen() {
+    if (pruefeLaeuft) return;
+    pruefeLaeuft = true; $("b-pruefen").disabled = true;
+    const tb = $("pruef-tabelle").querySelector("tbody");
+    tb.textContent = "";
+    let fehlerGesamt = 0;
+    const t0 = performance.now();
+    for (let op = 0; op < 8; op++) {
+      let falsch = 0, falschC = 0, falschZ = 0;
+      for (let a = 0; a < 256; a++) {
+        const ba = bits(a);
+        for (let b = 0; b < 256; b++) {
+          const r = rechenwerk(ba, bits(b), op, null);
+          const e = zahl(r.erg);
+          if (e !== referenz(op, a, b)) falsch++;
+          if (r.z !== (e === 0 ? 1 : 0)) falschZ++;
+          if (op === 0 && r.c !== ((a + b) > 255 ? 1 : 0)) falschC++;
+          if (op === 1 && r.c !== ((a - b) >= 0 ? 1 : 0)) falschC++;
+        }
+        if ((a & 31) === 0) {
+          $("pruef-balken").style.width = (100 * (op * 256 + a) / 2048).toFixed(1) + "%";
+          await new Promise((r) => setTimeout(r, 0));
+        }
+      }
+      fehlerGesamt += falsch + falschZ + falschC;
+      const tr = document.createElement("tr");
+      const gut = falsch + falschZ + falschC === 0;
+      tr.innerHTML = "<td>" + OPS[op] + "</td><td>65 536 Paare</td><td style='color:" +
+        (gut ? "var(--akzent)" : "var(--warn)") + "'>" +
+        (gut ? "alle richtig" : falsch + " Ergebnis · " + falschC + " Übertrag · " + falschZ + " Null") + "</td>";
+      tb.append(tr);
+    }
+    $("pruef-balken").style.width = "100%";
+    $("pruef-fuss").textContent = fehlerGesamt === 0
+      ? "524 288 Fälle geprüft, kein einziger falsch · " + ((performance.now() - t0) / 1000).toFixed(1) + " s"
+      : fehlerGesamt + " FALSCHE FÄLLE";
+    $("b-pruefen").disabled = false; pruefeLaeuft = false;
+  }
+
+  /* ============================= Bedienung ============================== */
+  function uebersetzen() {
+    try {
+      const r = assemble($("quelle").value);
+      zuZeile = r.zuZeile;
+      M.mem.fill(0); M.mem.set(r.code.slice(0, 256));
+      M.pc = 0; M.acc = 0; M.z = 0; M.c = 0; M.halt = false; M.takte = 0;
+      M.ausgabe = []; M.nand = 0; M.letzteSpur = null; M.letzterOp = null; M.letzteSchreibung = -1;
+      $("asm-lage").textContent = r.code.length + " Byte übersetzt";
+      $("lage").textContent = "übersetzt";
+      zeichneSpeicher(); zeichneListe(); werte(); zeichneGatter();
+      return true;
+    } catch (e) {
+      $("asm-lage").textContent = "Fehler: " + e.message;
+      $("lage").textContent = "Übersetzung gescheitert";
+      return false;
+    }
+  }
+
+  function einTakt() {
+    if (M.halt) { $("lage").textContent = "angehalten"; return; }
+    takt();
+    zeichneSpeicher(); zeichneListe(); werte(); zeichneGatter();
+    if (M.halt) $("lage").textContent = "angehalten nach " + nf.format(M.takte) + " Takten";
+  }
+
+  $("b-assemblieren").addEventListener("click", uebersetzen);
+  $("b-takt").addEventListener("click", einTakt);
+  $("b-reset").addEventListener("click", () => { M.laeuft = false; uebersetzen(); });
+  $("b-lauf").addEventListener("click", () => {
+    if (M.halt) uebersetzen();
+    M.laeuft = !M.laeuft;
+    $("b-lauf").textContent = M.laeuft ? "Anhalten" : "Lauf";
+  });
+  $("prog").addEventListener("change", () => { $("quelle").value = PROGRAMME[$("prog").value]; uebersetzen(); });
+  $("ebene").addEventListener("change", zeichneGatter);
+  $("bitwahl").addEventListener("change", zeichneGatter);
+  $("b-pruefen").addEventListener("click", pruefen);
+
+  const bw = $("bitwahl");
+  for (let i = 0; i < 8; i++) { const o = document.createElement("option"); o.value = i; o.textContent = i; bw.append(o); }
+  bw.value = "0";
+
+  function neuFarben() { zeichneGatter(); }
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", neuFarben);
+  new MutationObserver(neuFarben).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+  function schleife() {
+    if (M.laeuft && !M.halt) {
+      const n = +$("tempo").value;
+      for (let i = 0; i < n && !M.halt; i++) takt();
+      zeichneSpeicher(); zeichneListe(); werte(); zeichneGatter();
+      if (M.halt) { M.laeuft = false; $("b-lauf").textContent = "Lauf";
+        $("lage").textContent = "angehalten nach " + nf.format(M.takte) + " Takten"; }
+    }
+    requestAnimationFrame(schleife);
+  }
+
+  $("quelle").value = PROGRAMME.fib;
+  uebersetzen();
+  requestAnimationFrame(schleife);
+})();
+</script>
+</body>
+</html>
