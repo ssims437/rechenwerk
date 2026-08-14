@@ -216,12 +216,15 @@
   <div class="kasten">
     <div class="kasten-kopf">
       <span class="kl">Beweis statt Behauptung</span>
-      <button id="b-pruefen" class="haupt" style="margin-left:auto">Rechenwerk erschöpfend prüfen</button>
+      <button id="b-pruefen" class="haupt" style="margin-left:auto">Rechenwerk und Register erschöpfend prüfen</button>
     </div>
     <div class="kasten-leib">
       <p style="margin:0;color:var(--leise);font-size:14px">
         Acht Operationen, je alle 65 536 Eingangspaare, gegen eine unabhängige Referenz —
         Ergebnis, Übertrag und Null-Flag. Nicht Stichprobe, sondern vollständig.
+        Dazu die Speicherglieder: ein Register kann auf drei Arten falsch sein — es
+        übernimmt nicht, es hält nicht, oder es reicht den Eingang durch, solange der Takt
+        oben steht. Alle drei werden über je 256 Werte geprüft.
       </p>
       <div class="fortschritt"><i id="pruef-balken"></i></div>
       <table class="liste" id="pruef-tabelle"><tbody></tbody></table>
@@ -243,18 +246,33 @@
       <h3>Was hier Schaltung ist</h3>
       <p>
         Aus Gattern: das <b>Rechenwerk</b> mit acht Operationen, die <b>Auswahl</b> unter
-        ihnen als Multiplexerbaum, die <b>Steuersignale</b> und der <b>Befehlsdecoder</b>,
-        der aus vier Bit sechzehn Leitungen macht. Als Feld modelliert: <b>Speicher und
-        Register</b>. Das ist keine Schaltung, und es steht hier, statt es zu verschweigen.
+        ihnen als Multiplexerbaum, die <b>Steuersignale</b>, der <b>Befehlsdecoder</b>,
+        der aus vier Bit sechzehn Leitungen macht — und seit dem Umbau auch der
+        <b>Zustand</b>: Akkumulator, Programmzähler und die beiden Flags sind
+        Master-Slave-Flipflops aus je neun NAND. Als Feld modelliert bleibt der
+        <b>Speicher</b>: 256 Byte wären 2048 Flipflops. Das steht hier, statt es zu
+        verschweigen.
+      </p>
+    </section>
+    <section>
+      <h3>Warum Zustand anders ist</h3>
+      <p>
+        Alles Rechnende ist ein Ausdruck — einmal auswerten, fertig. Ein Speicherglied
+        kann das nicht sein: es muss seinen eigenen Ausgang wieder als Eingang sehen.
+        Damit ist die Auswertung kein Durchlauf mehr, sondern ein <b>Einschwingen</b>:
+        alle Gatter gleichzeitig aus den alten Werten rechnen, übernehmen, wiederholen,
+        bis sich nichts mehr ändert. Gemessen sind dafür höchstens <b>drei Runden</b> nötig.
       </p>
     </section>
     <section>
       <h3>Was es kostet</h3>
       <p>
-        Ein Befehl braucht rund <b>757 NAND-Auswertungen</b> allein im Rechenwerk — weil
-        alle acht Operationen immer gerechnet werden und der Multiplexer erst danach
-        auswählt. Genau so arbeitet Hardware: parallel und verschwenderisch, dafür in einem
-        Takt.
+        Ein Rechenbefehl braucht rund <b>757 NAND-Auswertungen</b> allein im Rechenwerk —
+        weil alle acht Operationen immer gerechnet werden und der Multiplexer erst danach
+        auswählt. Dazu kommt der Zustand: eine Taktflanke auf alle vier Register kostet je
+        nach wechselnden Bits <b>324 bis rund 970</b> weitere. Ein <code>ADD</code> liegt
+        damit bei etwa 1 385 NAND, ein <code>JMP</code> bei 564. Genau so arbeitet
+        Hardware: parallel und verschwenderisch, dafür in einem Takt.
       </p>
     </section>
     <section>
@@ -299,6 +317,77 @@
   const OR  = (a, b, n) => nand(NOT(a), NOT(b), n);
   const XOR = (a, b) => { const t = nand(a, b); return nand(nand(a, t), nand(b, t)); };
   const MUX = (a, b, s) => OR(AND(a, NOT(s)), AND(b, s));
+
+  /* ===================== Zustand, ebenfalls aus NAND =====================
+     Alles bisherige ist ein Ausdruck: Werte fließen in eine Richtung, einmal
+     ausgewertet steht das Ergebnis. Ein Speicherglied kann das nicht sein — es
+     muss seinen eigenen Ausgang wieder als Eingang sehen. Damit ist es kein
+     Ausdruck mehr, sondern ein Netz mit Rückkopplung, und die Auswertung ist
+     nicht ein Durchlauf, sondern ein Einschwingen: alle Gatter gleichzeitig aus
+     den alten Werten rechnen, übernehmen, wiederholen, bis sich nichts mehr
+     ändert. Das ist der Grund, warum Register hier lange ein JS-Feld waren. */
+
+  let RUNDEN_MAX = 0;      // höchste Rundenzahl, die je bis zur Ruhe nötig war
+  let RUNDEN_SUM = 0;      // Summe aller Runden (Diagnose)
+  let SCHWINGT   = 0;      // Netze, die nicht zur Ruhe kamen
+
+  // Ein Flipflop hält vier Knoten: Master-Q, Master-Q̄, Slave-Q, Slave-Q̄.
+  const neuesFF = () => Uint8Array.from([1, 0, 1, 0]);
+
+  // Ein Auswertungsschritt des ganzen Flipflops. Liest NUR aus k, schreibt erst
+  // am Ende — sonst wäre es kein gleichzeitiges Schalten, sondern eine
+  // Reihenfolge, die es in der Schaltung nicht gibt.
+  function ffSchritt(k, D, clk) {
+    const nD   = nand(D, D);
+    const nclk = nand(clk, clk);
+    const ms = nand(D, clk);          // Master ist durchlässig, solange clk = 1
+    const mr = nand(nD, clk);
+    const mq  = nand(ms, k[1]);
+    const mqn = nand(mr, k[0]);
+    const ss = nand(k[0], nclk);      // Slave übernimmt, wenn clk zurück auf 0 geht
+    const sr = nand(k[1], nclk);
+    const sq  = nand(ss, k[3]);
+    const sqn = nand(sr, k[2]);
+    k[0] = mq; k[1] = mqn; k[2] = sq; k[3] = sqn;
+  }
+
+  // Netz so lange auswerten, bis zwei Runden dasselbe ergeben.
+  function bisZurRuhe(k, D, clk, max = 40) {
+    const vorher = new Uint8Array(k.length);
+    for (let runde = 1; runde <= max; runde++) {
+      vorher.set(k);
+      ffSchritt(k, D, clk);
+      let stabil = true;
+      for (let i = 0; i < k.length; i++) if (k[i] !== vorher[i]) { stabil = false; break; }
+      if (stabil) {
+        if (runde > RUNDEN_MAX) RUNDEN_MAX = runde;
+        RUNDEN_SUM += runde;
+        return runde;
+      }
+    }
+    SCHWINGT++;
+    return -1;
+  }
+
+  // Ein Register ist eine Reihe Flipflops an einer gemeinsamen Taktleitung.
+  const neuesRegister = (breite) => ({ ff: Array.from({ length: breite }, neuesFF), breite });
+
+  function registerTakt(reg, d) {
+    for (let i = 0; i < reg.breite; i++) bisZurRuhe(reg.ff[i], d[i] & 1, 1);  // Flanke hinauf
+    for (let i = 0; i < reg.breite; i++) bisZurRuhe(reg.ff[i], d[i] & 1, 0);  // und zurück
+  }
+
+  const registerWert = (reg) => {
+    let n = 0;
+    for (let i = 0; i < reg.breite; i++) n |= reg.ff[i][2] << i;
+    return n;
+  };
+
+  // Nur zum Setzen eines Anfangszustands (Programmstart) — kein Betriebsweg.
+  function registerSetzen(reg, wert) {
+    const d = bits(wert & 255);
+    registerTakt(reg, reg.breite === 1 ? [wert & 1] : d);
+  }
 
   const bits = (n) => { const b = new Uint8Array(8); for (let i = 0; i < 8; i++) b[i] = (n >> i) & 1; return b; };
   const zahl = (b) => { let n = 0; for (let i = 0; i < 8; i++) n |= b[i] << i; return n; };
@@ -375,6 +464,13 @@
   const BEFEHLE = ["NOP","LDA","STA","LDI","ADD","SUB","AND","ORA","XOR","JMP","JZ","JC","INC","DEC","OUT","HLT"];
   const MIT_ADRESSE = new Set([1,2,3,4,5,6,7,8,9,10,11]);
 
+  // Der eigentliche Zustand der Maschine: vier Register aus Flipflops.
+  // Der Speicher bleibt ein Feld — 256 Byte wären 2048 Flipflops.
+  const ACC = neuesRegister(8);   // Akkumulator
+  const PC  = neuesRegister(8);   // Programmzähler
+  const FZ  = neuesRegister(1);   // Null-Flag
+  const FC  = neuesRegister(1);   // Übertrag-Flag
+
   const M = { mem:new Uint8Array(256), pc:0, acc:0, z:0, c:0, halt:false, takte:0,
               ausgabe:[], nand:0, letzteSpur:null, letzterOp:null, letzteSchreibung:-1, laeuft:false };
 
@@ -383,12 +479,16 @@
     const vorher = SCHALT;
     M.takte++;
     M.letzteSchreibung = -1;
+    // Der Zustand steht in den Flipflops, nicht in den JS-Feldern — von dort wird gelesen.
+    M.acc = registerWert(ACC); M.pc = registerWert(PC);
+    M.z = registerWert(FZ); M.c = registerWert(FC);
     const opcode = M.mem[M.pc] >> 4;
     const o = bits(opcode);
     const L = decoder16(o[0], o[1], o[2], o[3]);
     const hatAdr = MIT_ADRESSE.has(opcode);
     const adr = hatAdr ? M.mem[(M.pc + 1) & 255] : 0;
-    const naechste = (M.pc + (hatAdr ? 2 : 1)) & 255;
+    // Der Programmzähler zählt durch denselben Addierer wie das Rechenwerk.
+    const naechste = zahl(addierer8(bits(M.pc), bits(hatAdr ? 2 : 1), 0, null).s);
     const b = (opcode === 3) ? adr : M.mem[adr];
 
     let neuAcc = M.acc, springe = -1;
@@ -414,8 +514,13 @@
     if (L[15]) M.halt = true;
     if (opcode === 1 || opcode === 3) M.z = (neuAcc === 0) ? 1 : 0;
 
-    M.acc = neuAcc & 255;
-    M.pc = (springe >= 0 ? springe : naechste) & 255;
+    // Übernahme: eine Taktflanke auf alle Register. Erst danach steht der neue Zustand.
+    registerTakt(ACC, bits(neuAcc & 255));
+    registerTakt(PC,  bits((springe >= 0 ? springe : naechste) & 255));
+    registerTakt(FZ,  [M.z & 1]);
+    registerTakt(FC,  [M.c & 1]);
+    M.acc = registerWert(ACC); M.pc = registerWert(PC);
+    M.z = registerWert(FZ); M.c = registerWert(FC);
     M.nand += SCHALT - vorher;
     M.letzterTaktNand = SCHALT - vorher;
     return !M.halt;
@@ -744,6 +849,39 @@ HLT`
       case 5: return (~a) & 255; case 6: return (a << 1) & 255; case 7: return a >>> 1;
     }
   }
+  /* Prüfung der Speicherglieder. Ein Register kann auf drei Arten falsch sein:
+     es übernimmt nicht, es hält nicht, oder es reicht den Eingang durch, während
+     der Takt oben steht (dann ist es ein Latch und kein Flipflop). Alle drei
+     werden hier geprüft — gegen ein einfaches JS-Feld als Referenz. */
+  function pruefeRegister() {
+    const r = neuesRegister(8);
+    let f1 = 0, f2 = 0, f3 = 0, schwingtVorher = SCHWINGT;
+
+    // 1. Übernahme: jeder der 256 Werte muss nach einer Flanke am Ausgang stehen
+    for (let v = 0; v < 256; v++) {
+      registerTakt(r, bits(v));
+      if (registerWert(r) !== v) f1++;
+    }
+
+    // 2. Halten: Eingang wechselt, ohne Takt darf sich nichts rühren
+    registerTakt(r, bits(0xA5));
+    for (let v = 0; v < 256; v++) {
+      for (let i = 0; i < 8; i++) bisZurRuhe(r.ff[i], (v >> i) & 1, 0);   // Takt bleibt unten
+      if (registerWert(r) !== 0xA5) f2++;
+    }
+
+    // 3. Kein Durchgriff: solange der Takt oben steht, darf der Ausgang dem
+    //    Eingang nicht folgen — sonst wäre der Slave transparent.
+    for (let v = 0; v < 256; v++) {
+      const vorher = registerWert(r);
+      for (let i = 0; i < 8; i++) bisZurRuhe(r.ff[i], (v >> i) & 1, 1);   // nur Flanke hinauf
+      if (registerWert(r) !== vorher) f3++;
+      for (let i = 0; i < 8; i++) bisZurRuhe(r.ff[i], (v >> i) & 1, 0);   // Flanke zurück
+    }
+
+    return { f1, f2, f3, schwingt: SCHWINGT - schwingtVorher, runden: RUNDEN_MAX };
+  }
+
   let pruefeLaeuft = false;
   async function pruefen() {
     if (pruefeLaeuft) return;
@@ -777,9 +915,23 @@ HLT`
         (gut ? "alle richtig" : falsch + " Ergebnis · " + falschC + " Übertrag · " + falschZ + " Null") + "</td>";
       tb.append(tr);
     }
+    // Speicherglieder mitprüfen — sie sind seit dem Umbau ebenfalls Schaltung
+    const rp = pruefeRegister();
+    const regFehler = rp.f1 + rp.f2 + rp.f3 + rp.schwingt;
+    fehlerGesamt += regFehler;
+    const trR = document.createElement("tr");
+    trR.innerHTML = "<td>Register</td><td>768 Flanken</td><td style='color:" +
+      (regFehler === 0 ? "var(--akzent)" : "var(--warn)") + "'>" +
+      (regFehler === 0
+        ? "übernimmt, hält, kein Durchgriff"
+        : rp.f1 + " Übernahme · " + rp.f2 + " Halten · " + rp.f3 + " Durchgriff · " + rp.schwingt + " schwingt") +
+      "</td>";
+    tb.append(trR);
+
     $("pruef-balken").style.width = "100%";
     $("pruef-fuss").textContent = fehlerGesamt === 0
-      ? "524 288 Fälle geprüft, kein einziger falsch · " + ((performance.now() - t0) / 1000).toFixed(1) + " s"
+      ? "525 056 Fälle geprüft, kein einziger falsch · " + ((performance.now() - t0) / 1000).toFixed(1) +
+        " s · Flipflops schwingen nach höchstens " + RUNDEN_MAX + " Runden ein"
       : fehlerGesamt + " FALSCHE FÄLLE";
     $("b-pruefen").disabled = false; pruefeLaeuft = false;
   }
@@ -790,6 +942,8 @@ HLT`
       const r = assemble($("quelle").value);
       zuZeile = r.zuZeile;
       M.mem.fill(0); M.mem.set(r.code.slice(0, 256));
+      registerSetzen(ACC, 0); registerSetzen(PC, 0);
+      registerSetzen(FZ, 0); registerSetzen(FC, 0);
       M.pc = 0; M.acc = 0; M.z = 0; M.c = 0; M.halt = false; M.takte = 0;
       M.ausgabe = []; M.nand = 0; M.letzteSpur = null; M.letzterOp = null; M.letzteSchreibung = -1;
       $("asm-lage").textContent = r.code.length + " Byte übersetzt";
