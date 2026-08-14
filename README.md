@@ -162,7 +162,8 @@ den Unterschied zwischen Flipflop und Latch überhaupt bemerkt.
 
 [MIT](LICENSE)
 
-Verwandt: [Redundanz](https://github.com/ssims437/redundanz) ·
+Verwandt: [Plotterblätter](https://github.com/ssims437/plotterblaetter) ·
+[Redundanz](https://github.com/ssims437/redundanz) ·
 [Reparatur](https://github.com/ssims437/reparatur) ·
 [Würfel](https://github.com/ssims437/wuerfel) ·
-[Plotterblätter](https://github.com/ssims437/plotterblaetter)
+[Nachkomma](https://github.com/ssims437/nachkomma)
