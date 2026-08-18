@@ -162,4 +162,4 @@ den Unterschied zwischen Flipflop und Latch überhaupt bemerkt.
 
 [MIT](LICENSE)
 
-Alle fünfzehn Blätter, nach Feld geordnet: **[ssims437.github.io](https://ssims437.github.io/)**
+Alle Blätter nach Feld geordnet: **[ssims437.github.io](https://ssims437.github.io/)**
