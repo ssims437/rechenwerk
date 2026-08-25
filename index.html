@@ -13,10 +13,10 @@
     --tief:  #E4E8EE;
     --linie: #C3CBD6;
     --tinte: #10151C;
-    --leise: #626F80;
+    --leise: #5A6676;
     --eins:  #C2760B;
     --null:  #A9B4C2;
-    --akzent:#0E7490;
+    --merk:#0E7490;
     --warn:  #B3261E;
     --schatten: 0 1px 0 rgba(16,21,28,.05), 0 10px 24px -16px rgba(16,21,28,.45);
     --f-fest: ui-monospace, "Cascadia Mono", "SF Mono", Consolas, "DejaVu Sans Mono", monospace;
@@ -26,14 +26,14 @@
     :root:not([data-theme="light"]) {
       --grund: #0E1116; --feld: #151A21; --tief: #0A0D12; --linie: #253040;
       --tinte: #D8E0EA; --leise: #7A8899; --eins: #E8A33D; --null: #3A4757;
-      --akzent: #4FC3D9; --warn: #E0695E;
+      --merk: #4FC3D9; --warn: #E0695E;
       --schatten: 0 1px 0 rgba(255,255,255,.03), 0 12px 30px -18px #000;
     }
   }
   :root[data-theme="dark"] {
     --grund: #0E1116; --feld: #151A21; --tief: #0A0D12; --linie: #253040;
     --tinte: #D8E0EA; --leise: #7A8899; --eins: #E8A33D; --null: #3A4757;
-    --akzent: #4FC3D9; --warn: #E0695E;
+    --merk: #4FC3D9; --warn: #E0695E;
     --schatten: 0 1px 0 rgba(255,255,255,.03), 0 12px 30px -18px #000;
   }
 
@@ -58,12 +58,12 @@
   .kl { font-family:var(--f-fest); font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--leise); }
   button, select { font-family:var(--f-fest); font-size:12px; color:var(--tinte); background:var(--grund);
     border:1px solid var(--linie); border-radius:0; padding:6px 10px; cursor:pointer; letter-spacing:.03em; }
-  button:hover, select:hover { border-color:var(--akzent); }
+  button:hover, select:hover { border-color:var(--merk); }
   button:active { background:var(--tief); }
   button:disabled { opacity:.45; cursor:default; }
-  button.haupt { background:var(--akzent); border-color:var(--akzent); color:var(--feld); }
+  button.haupt { background:var(--merk); border-color:var(--merk); color:var(--feld); }
   button.haupt:hover { filter:brightness(1.1); }
-  :focus-visible { outline:2px solid var(--akzent); outline-offset:2px; }
+  :focus-visible { outline:2px solid var(--merk); outline-offset:2px; }
 
   .buehne { display:grid; grid-template-columns: 1fr 1fr; gap:18px; align-items:start; }
   @media (max-width: 900px) { .buehne { grid-template-columns: minmax(0,1fr); } }
@@ -89,8 +89,8 @@
   .zelle { aspect-ratio:1; display:flex; align-items:center; justify-content:center;
     font-family:var(--f-fest); font-size:9px; background:var(--tief); color:var(--leise);
     border:1px solid transparent; overflow:hidden; }
-  .zelle.pc   { background:var(--akzent); color:var(--feld); border-color:var(--akzent); }
-  .zelle.arg  { border-color:var(--akzent); color:var(--tinte); }
+  .zelle.pc   { background:var(--merk); color:var(--feld); border-color:var(--merk); }
+  .zelle.arg  { border-color:var(--merk); color:var(--tinte); }
   .zelle.daten{ color:var(--tinte); background:var(--feld); }
   .zelle.frisch { background:var(--eins); color:var(--feld); }
 
@@ -101,11 +101,11 @@
 
   table.liste { width:100%; border-collapse:collapse; font-family:var(--f-fest); font-size:11.5px; }
   table.liste td { padding:2px 6px 2px 0; white-space:nowrap; }
-  table.liste tr.jetzt td { background:var(--akzent); color:var(--feld); }
+  table.liste tr.jetzt td { background:var(--merk); color:var(--feld); }
   .listenrahmen { max-height:230px; overflow:auto; border:1px solid var(--linie); padding:6px 8px; background:var(--tief); }
 
   .fortschritt { height:4px; background:var(--tief); overflow:hidden; border:1px solid var(--linie); }
-  .fortschritt i { display:block; height:100%; background:var(--akzent); width:0; }
+  .fortschritt i { display:block; height:100%; background:var(--merk); width:0; }
 
   .noten { display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:24px;
     border-top:1px solid var(--linie); padding-top:20px; }
@@ -116,12 +116,22 @@
   code { font-family:var(--f-fest); font-size:.9em; background:var(--tief); padding:1px 4px; color:var(--tinte); }
   footer { border-top:1px solid var(--linie); padding-top:14px; font-family:var(--f-fest);
     font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--leise); }
-  footer a { color:var(--akzent); }
+  footer a { color:var(--merk); }
 
   /* PFLEGE: breite-schirme */
   @media (min-width: 1500px) { .blatt { max-width: 1360px; } }
   @media (min-width: 1800px) { .blatt { max-width: 1560px; } }
   @media (min-width: 2200px) { .blatt { max-width: 1800px; } }
+
+  /* PFLEGE: schmalschirm */
+  @media (max-width: 700px) {
+    table { display: block; max-width: 100%; overflow-x: auto; }
+    select, input[type=text], input[type=number], input[type=search] { max-width: 100%; }
+  }
+
+  /* PFLEGE: klickflaechen */
+  button, select { min-height: 34px; }
+  input[type=range] { height: 26px; }
 </style>
 </head>
 <body>
@@ -129,7 +139,7 @@
 <div class="blatt">
 
   <header>
-    <p class="marke">Ein Grundbaustein · sechzehn Befehle · erschöpfend geprüft</p>
+    <p class="marke">Blatt · Maschine</p>
     <h1>Rechenwerk: ein Computer aus <span>NAND</span></h1>
     <p class="vorspann">
       Ein NAND-Gatter kann fast nichts: zwei Eingänge, ein Ausgang, und es sagt nur dann
@@ -160,7 +170,10 @@
       <option value="200">so schnell es geht</option>
     </select>
     <span class="kl" id="lage" style="margin-left:auto">bereit</span>
-  </div>
+  
+      <span style="flex:1"></span>
+      <button id="b-thema">Ansicht</button>
+    </div>
 
   <dl class="register">
     <div class="reg"><dt>Befehlszähler</dt><dd id="r-pc">0</dd></div>
@@ -708,8 +721,16 @@ HLT`
       tr.innerHTML = "<td>" + String(adr).padStart(3, "0") + "</td><td>" + text.replace(/</g, "&lt;") + "</td>";
       tb.append(tr);
     }
+    /* Nur im Kasten scrollen. scrollIntoView zieht die ganze Seite mit — beim
+       Aufbau stand die Überschrift dadurch schon 86 Pixel außerhalb des
+       Bildes, noch bevor jemand etwas angefasst hatte. */
     const jetzt = tb.querySelector("tr.jetzt");
-    if (jetzt) jetzt.scrollIntoView({ block: "nearest" });
+    const rahmen = tb.closest(".listenrahmen");
+    if (jetzt && rahmen) {
+      const z = jetzt.getBoundingClientRect(), k = rahmen.getBoundingClientRect();
+      if (z.top < k.top) rahmen.scrollTop += z.top - k.top;
+      else if (z.bottom > k.bottom) rahmen.scrollTop += z.bottom - k.bottom;
+    }
   }
 
   function werte() {
@@ -730,7 +751,7 @@ HLT`
     return { tief: cs.getPropertyValue("--tief").trim(), linie: cs.getPropertyValue("--linie").trim(),
       eins: cs.getPropertyValue("--eins").trim(), null: cs.getPropertyValue("--null").trim(),
       tinte: cs.getPropertyValue("--tinte").trim(), leise: cs.getPropertyValue("--leise").trim(),
-      akzent: cs.getPropertyValue("--akzent").trim(), feld: cs.getPropertyValue("--feld").trim() };
+      akzent: cs.getPropertyValue("--merk").trim(), feld: cs.getPropertyValue("--feld").trim() };
   }
 
   // Name ins Gatter statt darüber: über dem Gatter kollidiert er mit Leitungen
@@ -938,7 +959,7 @@ HLT`
       const tr = document.createElement("tr");
       const gut = falsch + falschZ + falschC === 0;
       tr.innerHTML = "<td>" + OPS[op] + "</td><td>65 536 Paare</td><td style='color:" +
-        (gut ? "var(--akzent)" : "var(--warn)") + "'>" +
+        (gut ? "var(--merk)" : "var(--warn)") + "'>" +
         (gut ? "alle richtig" : falsch + " Ergebnis · " + falschC + " Übertrag · " + falschZ + " Null") + "</td>";
       tb.append(tr);
     }
@@ -948,7 +969,7 @@ HLT`
     fehlerGesamt += regFehler;
     const trR = document.createElement("tr");
     trR.innerHTML = "<td>Register</td><td>768 Flanken</td><td style='color:" +
-      (regFehler === 0 ? "var(--akzent)" : "var(--warn)") + "'>" +
+      (regFehler === 0 ? "var(--merk)" : "var(--warn)") + "'>" +
       (regFehler === 0
         ? "übernimmt, hält, kein Durchgriff"
         : rp.f1 + " Übernahme · " + rp.f2 + " Halten · " + rp.f3 + " Durchgriff · " + rp.schwingt + " schwingt") +
@@ -1026,6 +1047,31 @@ HLT`
   $("quelle").value = PROGRAMME.fib;
   uebersetzen();
   requestAnimationFrame(schleife);
+
+  /* PFLEGE: ansicht — dieselbe Bedienung wie in den übrigen Blättern: erst die
+     Systemvorgabe, ein Druck stellt bewusst um. Gezeichnet wird danach neu,
+     weil Farben aus dem Stilblatt im Bild nicht von selbst nachziehen. */
+  (function () {
+    const knopf = document.getElementById("b-thema");
+    if (!knopf) return;
+    knopf.addEventListener("click", () => {
+      const jetzt = document.documentElement.getAttribute("data-theme");
+      const dunkel = matchMedia("(prefers-color-scheme: dark)").matches;
+      document.documentElement.setAttribute("data-theme",
+        jetzt ? (jetzt === "dark" ? "light" : "dark") : (dunkel ? "light" : "dark"));
+      const male = [];
+      if (typeof refreshTheme === "function") male.push(refreshTheme);
+      if (typeof neuFarben === "function") male.push(neuFarben);
+      if (typeof zeichnen === "function") male.push(zeichnen);
+      if (typeof zeichne === "function") male.push(zeichne);
+      if (typeof draw === "function") male.push(draw);
+      if (typeof render === "function") male.push(render);
+      if (typeof lauf === "function") male.push(lauf);
+      if (typeof neu === "function") male.push(neu);
+      for (const f of male) { try { f(); } catch (e) { void e; } }
+    });
+  })();
+
 })();
 </script>
 </body>
